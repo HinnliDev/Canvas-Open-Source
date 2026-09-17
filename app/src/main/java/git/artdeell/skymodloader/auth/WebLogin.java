@@ -247,8 +247,7 @@ public class WebLogin extends WebViewClient implements SystemAccountInterface {
         String redirectUrl = getRedirectUrl();
         String urlWithoutQuery = url.split("\\?")[0];
 
-        // Check if the current URL itself (not query params) is the oauth_redirect endpoint
-        if (urlWithoutQuery.equalsIgnoreCase(redirectUrl) || url.startsWith(redirectUrl + "?") || url.equals(redirectUrl)) {
+        if (urlWithoutQuery.endsWith("/account/auth/oauth_redirect") || urlWithoutQuery.endsWith("/account/auth/oauth_redirect/") || urlWithoutQuery.equalsIgnoreCase(redirectUrl) || url.startsWith(redirectUrl + "?") || url.equals(redirectUrl)) {
             Log.i(TAG, "Real OAuth redirect reached: " + url);
             m_resultPending = true;
             m_activity.runOnUiThread(() -> {
