@@ -88,6 +88,7 @@ public class GameActivity extends TGCNativeActivity implements View.OnCapturedPo
     private int m_nativeHeight;
     private int m_nativeWidth;
     private ImGUI imgui;
+    private SurfaceView gameView;
     private SurfaceView imguiView;
     private boolean imguiKeybaordShowing;
     private ImGUITextInput imguiInput;
@@ -97,6 +98,8 @@ public class GameActivity extends TGCNativeActivity implements View.OnCapturedPo
     private boolean m_editTextFocused = false;
     private boolean m_isKeyboardShowing = false;
     private RelativeLayout m_relativeLayout;
+    private final int[] m_gameViewLocation = new int[2];
+    private final float[] m_gameInputOffset = new float[2];
     private final int[] m_imguiViewLocation = new int[2];
     SystemAccounts_android m_systemAccounts = null;
     private boolean m_lTriggerPressed = false;
@@ -238,7 +241,8 @@ public class GameActivity extends TGCNativeActivity implements View.OnCapturedPo
         setContentView(R.layout.tgc_logo);
         this.m_relativeLayout = findViewById(R.id.sml_relLayout);
         this.m_relativeLayout.setOnCapturedPointerListener(this);
-        ((SurfaceView) findViewById(R.id.surfaceView)).getHolder().addCallback(this);
+        gameView = findViewById(R.id.surfaceView);
+        gameView.getHolder().addCallback(this);
         FileSelector.setActivity(this);
         if (imgui == null) imgui = new ImGUI();
         imguiView = findViewById(R.id.imguiView);
@@ -666,6 +670,15 @@ public class GameActivity extends TGCNativeActivity implements View.OnCapturedPo
         });
     }
 
+    private void updateGameInputOffset(MotionEvent motionEvent) {
+    m_gameInputOffset[0] = 0.0f;
+    m_gameInputOffset[1] = 0.0f;
+    if (gameView == null) return;
+    gameView.getLocationOnScreen(m_gameViewLocation);
+    m_gameInputOffset[0] = motionEvent.getRawX() - motionEvent.getX() - m_gameViewLocation[0];
+    m_gameInputOffset[1] = motionEvent.getRawY() - motionEvent.getY() - m_gameViewLocation[1];
+}
+
     @Override
     public boolean onTouchEvent(MotionEvent motionEvent) {
         int actionMasked = motionEvent.getActionMasked();
@@ -685,16 +698,19 @@ public class GameActivity extends TGCNativeActivity implements View.OnCapturedPo
         if (wantsKeyboard && !imguiKeybaordShowing) { imguiInput.setKeyboardState(true); imguiKeybaordShowing = true; }
         if (!wantsKeyboard && imguiKeybaordShowing) { imguiInput.setKeyboardState(false); imguiKeybaordShowing = false; }
         if (ImGUI.wantsMouse()) return true;
+        updateGameInputOffset(motionEvent);
         if (actionMasked == MotionEvent.ACTION_MOVE || actionMasked == MotionEvent.ACTION_CANCEL) {
             for (int i = 0; i < motionEvent.getPointerCount(); i++) {
                 onTouchNative(motionEvent.getPointerId(i) + 1, actionMasked,
-                    motionEvent.getX(i), motionEvent.getY(i));
+                    motionEvent.getX(i) + m_gameInputOffset[0],
+                    motionEvent.getY(i) + m_gameInputOffset[1]);
             }
             return true;
         }
         int actionIndex = motionEvent.getActionIndex();
         return onTouchNative(motionEvent.getPointerId(actionIndex) + 1, actionMasked,
-            motionEvent.getX(actionIndex), motionEvent.getY(actionIndex));
+            motionEvent.getX(actionIndex) + m_gameInputOffset[0],
+            motionEvent.getY(actionIndex) + m_gameInputOffset[1]);
     }
 
     // Hardware-mouse input for the ImGui overlay (no stock counterpart -
@@ -740,7 +756,10 @@ public class GameActivity extends TGCNativeActivity implements View.OnCapturedPo
     public boolean dispatchTouchEvent(MotionEvent motionEvent) {
         if (isHardwareMouseEvent(motionEvent)) {
             if (isGamepadWithTouchpadEvent(motionEvent)) return true;
-            PointF point = transformPointToProgram(motionEvent.getX(), motionEvent.getY());
+            updateGameInputOffset(motionEvent);
+            PointF point = transformPointToProgram(
+                motionEvent.getX() + m_gameInputOffset[0],
+                motionEvent.getY() + m_gameInputOffset[1]);
             // Mouse-to-ImGui: primary-button gestures mirror the touch path
             // - position plus button 0 - and wantsMouse() then arbitrates
             // ownership just like onTouchEvent does for touches. The
